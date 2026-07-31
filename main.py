@@ -7,18 +7,12 @@ from bs4 import BeautifulSoup
 import telebot
 from flask import Flask
 
-# Микро-сервер для удержания процесса на Render
 app = Flask('')
 
 @app.route('/')
 def home():
     return "Bot is running 24/7!"
 
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-# Настройки бота
 TOKEN = '8740369059:AAHOgepptLqDaTuomKNp6PsmlQyvjPXoccA'
 USERS = [8475243990, 6642526111]
 
@@ -29,6 +23,7 @@ seen_links = set()
 def send_async_message(user_id, text):
     try:
         bot.send_message(user_id, text, parse_mode='Markdown')
+        print(f"✅ Сообщение отправлено {user_id}")
     except Exception as e:
         print(f"⚠️ Ошибка отправки пользователю {user_id}: {e}")
 
@@ -59,6 +54,7 @@ def extract_real_price(article_soup):
 
 def main_scraper_loop():
     print("Запуск мониторинга на облачном хостинге...")
+    time.sleep(3)
     send_to_all("☁️ **Бота успешно перенесли на бесплатный хостинг!**\nТеперь он работает 24/7 без участия телефона.")
     
     check_count = 0
@@ -109,8 +105,9 @@ def main_scraper_loop():
 
         time.sleep(20)
 
+threading.Thread(target=main_scraper_loop, daemon=True).start()
+
 if __name__ == '__main__':
-    # Запускаем веб-сервер в отдельном потоке
-    threading.Thread(target=run_web).start()
-    # Запускаем парсер
-    main_scraper_loop()
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+    
