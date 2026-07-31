@@ -1,0 +1,5 @@
+pyTelegramBotAPI
+cloudscraper
+beautifulsoup4
+Flask
+gunicorn
