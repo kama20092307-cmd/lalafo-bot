@@ -19,23 +19,22 @@ seen_ids = set()
 
 SEARCH_URL = "https://lalafo.kg/api/2.0/feed"
 
-# Диапазон цен для фильтра (сомы)
 PRICE_MIN = 1000
 PRICE_MAX = 15000
 
 def send_async_message(user_id, text):
     try:
         bot.send_message(user_id, text, parse_mode='Markdown')
-        print(f"✅ Сообщение отправлено {user_id}")
+        print(f"✅ Сообщение отправлено {user_id}", flush=True)
     except Exception as e:
-        print(f"⚠️ Ошибка отправки пользователю {user_id}: {e}")
+        print(f"⚠️ Ошибка отправки пользователю {user_id}: {e}", flush=True)
 
 def send_to_all(message_text):
     for uid in USERS:
         threading.Thread(target=send_async_message, args=(uid, message_text)).start()
 
 def main_scraper_loop():
-    print("Запуск расширенного поиска iPhone...")
+    print("Запуск расширенного поиска iPhone...", flush=True)
     time.sleep(3)
     send_to_all("🎯 **Бот переведён на расширенный глобальный поиск!**\nСканирую все объявления без ограничений по категориям...")
 
@@ -54,7 +53,7 @@ def main_scraper_loop():
 
     while True:
         cycle_count += 1
-        print(f"\n===== Цикл #{cycle_count} =====")
+        print(f"\n===== Цикл #{cycle_count} =====", flush=True)
         try:
             for kw in keywords:
                 params = {
@@ -65,23 +64,28 @@ def main_scraper_loop():
 
                 response = session.get(SEARCH_URL, headers=headers, params=params, timeout=15)
 
-                print(f"[{kw}] HTTP статус: {response.status_code}")
+                print(f"[{kw}] HTTP статус: {response.status_code}", flush=True)
+
+                if cycle_count == 1:
+                    send_to_all(f"🔧 Диагностика [{kw}]: HTTP статус {response.status_code}, длина ответа {len(response.text)}")
 
                 if response.status_code == 200:
                     try:
                         data = response.json()
                     except Exception as e:
-                        print(f"[{kw}] ⚠️ Не удалось распарсить JSON: {e}")
-                        print(f"[{kw}] Сырой ответ (первые 500 симв.): {response.text[:500]}")
+                        print(f"[{kw}] ⚠️ Не удалось распарсить JSON: {e}", flush=True)
+                        print(f"[{kw}] Сырой ответ (первые 500 симв.): {response.text[:500]}", flush=True)
                         continue
 
-                    print(f"[{kw}] Ключи верхнего уровня в ответе: {list(data.keys())}")
+                    print(f"[{kw}] Ключи верхнего уровня в ответе: {list(data.keys())}", flush=True)
 
                     items = data.get('items', []) or data.get('feed', [])
-                    print(f"[{kw}] Найдено объявлений в ответе: {len(items)}")
+                    print(f"[{kw}] Найдено объявлений в ответе: {len(items)}", flush=True)
 
                     if len(items) == 0:
-                        print(f"[{kw}] Пример сырого ответа: {response.text[:800]}")
+                        print(f"[{kw}] Пример сырого ответа: {response.text[:800]}", flush=True)
+                        if cycle_count == 1:
+                            send_to_all(f"🔧 [{kw}]: объявлений 0. Сырой ответ: {response.text[:300]}")
 
                     new_count = 0
                     for item in items:
@@ -95,7 +99,7 @@ def main_scraper_loop():
                         price = item.get('price')
                         title = item.get('title', 'iPhone')
 
-                        print(f"[{kw}] Новое объявление: id={item_id}, price={price}, title={title}")
+                        print(f"[{kw}] Новое объявление: id={item_id}, price={price}, title={title}", flush=True)
 
                         if price and PRICE_MIN <= int(price) <= PRICE_MAX:
                             price_val = int(price)
@@ -113,16 +117,20 @@ def main_scraper_loop():
                             send_to_all(msg)
                             time.sleep(1)
 
-                    print(f"[{kw}] Новых объявлений за этот проход: {new_count}")
+                    print(f"[{kw}] Новых объявлений за этот проход: {new_count}", flush=True)
 
                 else:
-                    print(f"[{kw}] ⚠️ Плохой статус: {response.status_code}")
-                    print(f"[{kw}] Ответ сервера: {response.text[:500]}")
+                    print(f"[{kw}] ⚠️ Плохой статус: {response.status_code}", flush=True)
+                    print(f"[{kw}] Ответ сервера: {response.text[:500]}", flush=True)
+                    if cycle_count == 1:
+                        send_to_all(f"🔧 [{kw}]: плохой статус {response.status_code}. Ответ: {response.text[:300]}")
 
                 time.sleep(3)
 
         except Exception as e:
-            print(f"⚠️ Ошибка в цикле: {e}")
+            print(f"⚠️ Ошибка в цикле: {e}", flush=True)
+            if cycle_count == 1:
+                send_to_all(f"🔧 Ошибка в цикле: {e}")
 
         time.sleep(20)
 
