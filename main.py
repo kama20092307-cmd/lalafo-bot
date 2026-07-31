@@ -71,7 +71,7 @@ def process_page_articles(articles):
         if 'iphone' in full_text or 'айфон' in full_text:
             price = extract_real_price(art)
             
-            if price and 1000 <= price <= 15000:
+            if price and 15000 <= price <= 30000:
                 msg = (
                     f"🔥 **НАХОДКА ДО 15 000 СОМ!**\n\n"
                     f"💰 **Цена:** {price} KGS\n"
