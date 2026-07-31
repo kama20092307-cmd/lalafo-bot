@@ -19,6 +19,10 @@ seen_ids = set()
 
 SEARCH_URL = "https://lalafo.kg/api/2.0/feed"
 
+# Диапазон цен для фильтра (сомы)
+PRICE_MIN = 1000
+PRICE_MAX = 15000
+
 def send_async_message(user_id, text):
     try:
         bot.send_message(user_id, text, parse_mode='Markdown')
@@ -34,7 +38,7 @@ def main_scraper_loop():
     print("Запуск расширенного поиска iPhone...")
     time.sleep(3)
     send_to_all("🎯 **Бот переведён на расширенный глобальный поиск!**\nСканирую все объявления без ограничений по категориям...")
-    
+
     headers = {
         "User-Agent": "Lalafo/4.65.0 (Android; 13)",
         "Accept": "application/json",
@@ -45,10 +49,12 @@ def main_scraper_loop():
 
     session = requests.Session()
 
-    # Проверяем оба ключевых слова
     keywords = ["iphone", "айфон"]
+    cycle_count = 0
 
     while True:
+        cycle_count += 1
+        print(f"\n===== Цикл #{cycle_count} =====")
         try:
             for kw in keywords:
                 params = {
@@ -56,46 +62,67 @@ def main_scraper_loop():
                     "limit": 30,
                     "sort_by": "created_at:desc"
                 }
-                
+
                 response = session.get(SEARCH_URL, headers=headers, params=params, timeout=15)
-                
+
+                print(f"[{kw}] HTTP статус: {response.status_code}")
+
                 if response.status_code == 200:
-                    data = response.json()
+                    try:
+                        data = response.json()
+                    except Exception as e:
+                        print(f"[{kw}] ⚠️ Не удалось распарсить JSON: {e}")
+                        print(f"[{kw}] Сырой ответ (первые 500 симв.): {response.text[:500]}")
+                        continue
+
+                    print(f"[{kw}] Ключи верхнего уровня в ответе: {list(data.keys())}")
+
                     items = data.get('items', []) or data.get('feed', [])
-                    
+                    print(f"[{kw}] Найдено объявлений в ответе: {len(items)}")
+
+                    if len(items) == 0:
+                        print(f"[{kw}] Пример сырого ответа: {response.text[:800]}")
+
+                    new_count = 0
                     for item in items:
                         item_id = item.get('id')
                         if not item_id or item_id in seen_ids:
                             continue
-                        
+
                         seen_ids.add(item_id)
-                        
+                        new_count += 1
+
                         price = item.get('price')
                         title = item.get('title', 'iPhone')
-                        
-                        # Фильтр: от 1 000 до 15 000 сом
-                        if price and 1000 <= int(price) <= 15000:
+
+                        print(f"[{kw}] Новое объявление: id={item_id}, price={price}, title={title}")
+
+                        if price and PRICE_MIN <= int(price) <= PRICE_MAX:
                             price_val = int(price)
                             item_url = item.get('url', f"https://lalafo.kg/{item_id}")
                             if not item_url.startswith('http'):
                                 item_url = "https://lalafo.kg" + item_url
-                                
+
                             msg = (
-                                f"🔥 **НАХОДКА ДО 15 000 СОМ!**\n\n"
+                                f"🔥 **НАХОДКА ДО {PRICE_MAX:,} СОМ!**\n\n"
                                 f"📱 **{title}**\n"
                                 f"💰 **Цена:** {price_val:,} KGS\n"
                                 f"🔗 {item_url}"
                             ).replace(',', ' ')
-                            
+
                             send_to_all(msg)
                             time.sleep(1)
+
+                    print(f"[{kw}] Новых объявлений за этот проход: {new_count}")
+
                 else:
-                    print(f"Статус {kw}: {response.status_code}")
-                
-                time.sleep(3) # Пауза между запросами по ключам
+                    print(f"[{kw}] ⚠️ Плохой статус: {response.status_code}")
+                    print(f"[{kw}] Ответ сервера: {response.text[:500]}")
+
+                time.sleep(3)
 
         except Exception as e:
-            print(f"⚠️ Ошибка: {e}")
+            print(f"⚠️ Ошибка в цикле: {e}")
 
         time.sleep(20)
 
@@ -104,4 +131,3 @@ threading.Thread(target=main_scraper_loop, daemon=True).start()
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
-    
