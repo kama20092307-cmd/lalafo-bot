@@ -52,51 +52,59 @@ def extract_real_price(article_soup):
 
     return None
 
+def process_page_articles(articles):
+    found_count = 0
+    for art in articles:
+        link_tag = art.find('a', href=True)
+        if not link_tag:
+            continue
+            
+        full_link = "https://lalafo.kg" + link_tag['href'] if link_tag['href'].startswith('/') else link_tag['href']
+        
+        # Если ссылку уже отправляли — пропускаем (защита от повторов)
+        if full_link in seen_links:
+            continue
+        
+        seen_links.add(full_link)
+        full_text = art.text.lower()
+        
+        if 'iphone' in full_text or 'айфон' in full_text:
+            price = extract_real_price(art)
+            
+            if price and 1000 <= price <= 15000:
+                msg = (
+                    f"🔥 **НАХОДКА ДО 15 000 СОМ!**\n\n"
+                    f"💰 **Цена:** {price} KGS\n"
+                    f"🔗 {full_link}"
+                )
+                send_to_all(msg)
+                found_count += 1
+                time.sleep(1) # Небольшая пауза между сообщениями в Telegram
+    return found_count
+
 def main_scraper_loop():
     print("Запуск мониторинга на облачном хостинге...")
     time.sleep(3)
-    send_to_all("☁️ **Бота успешно перенесли на бесплатный хостинг!**\nТеперь он работает 24/7 без участия телефона.")
+    send_to_all("🔎 **Сканирую существующих и новых iPhone до 15 000 сом...**")
     
     check_count = 0
     while True:
         try:
             check_count += 1
             scraper = cloudscraper.create_scraper()
-            fresh_url = f"{BASE_URL}?sort_by=created_at%3Adesc&_cache_bust={int(time.time())}"
             
-            print(f"[{time.strftime('%H:%M:%S')}] Проверка №{check_count}...")
-            response = scraper.get(fresh_url, timeout=20)
-            
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                articles = soup.find_all('article')
+            # Проверяем первые 2 страницы текущей ленты
+            for page in range(1, 3):
+                fresh_url = f"{BASE_URL}?page={page}&sort_by=created_at%3Adesc&_cache_bust={int(time.time())}"
+                response = scraper.get(fresh_url, timeout=20)
                 
-                for art in articles:
-                    link_tag = art.find('a', href=True)
-                    if not link_tag:
-                        continue
-                        
-                    full_link = "https://lalafo.kg" + link_tag['href'] if link_tag['href'].startswith('/') else link_tag['href']
-                    
-                    if full_link in seen_links:
-                        continue
-                    
-                    seen_links.add(full_link)
-                    full_text = art.text.lower()
-                    
-                    if 'iphone' in full_text or 'айфон' in full_text:
-                        price = extract_real_price(art)
-                        
-                        if price and 1000 <= price <= 15000:
-                            msg = (
-                                f"🔥 **НАХОДКА ДО 15 000 СОМ!**\n\n"
-                                f"💰 **Цена:** {price} KGS\n"
-                                f"🔗 {full_link}"
-                            )
-                            send_to_all(msg)
-                            print(f"⚡ Находка отправлена: {price} сом")
-            else:
-                print(f"Статус ответа: {response.status_code}")
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    articles = soup.find_all('article')
+                    process_page_articles(articles)
+                else:
+                    print(f"Статус ответа страницы {page}: {response.status_code}")
+                time.sleep(2)
 
         except Exception as e:
             print(f"⚠️ Ошибка: {e}. Повтор через 15 сек...")
