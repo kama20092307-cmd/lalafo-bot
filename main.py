@@ -1,7 +1,7 @@
 import os
 import time
 import threading
-import requests
+import cloudscraper
 import telebot
 from flask import Flask
 
@@ -46,7 +46,13 @@ def main_scraper_loop():
         "X-App-Version": "4.65.0"
     }
 
-    session = requests.Session()
+    session = cloudscraper.create_scraper(
+        browser={
+            'browser': 'chrome',
+            'platform': 'android',
+            'mobile': True
+        }
+    )
 
     keywords = ["iphone", "айфон"]
     cycle_count = 0
@@ -62,7 +68,7 @@ def main_scraper_loop():
                     "sort_by": "created_at:desc"
                 }
 
-                response = session.get(SEARCH_URL, headers=headers, params=params, timeout=15)
+                response = session.get(SEARCH_URL, headers=headers, params=params, timeout=20)
 
                 print(f"[{kw}] HTTP статус: {response.status_code}", flush=True)
 
