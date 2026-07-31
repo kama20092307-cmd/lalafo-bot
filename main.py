@@ -17,7 +17,6 @@ USERS = [8475243990, 6642526111]
 bot = telebot.TeleBot(TOKEN)
 seen_ids = set()
 
-# Прямой URL API Lalafo для категории "Мобильные телефоны"
 API_URL = "https://lalafo.kg/api/1.0/open/feed"
 
 def send_async_message(user_id, text):
@@ -32,81 +31,61 @@ def send_to_all(message_text):
         threading.Thread(target=send_async_message, args=(uid, message_text)).start()
 
 def main_scraper_loop():
-    print("Запуск мониторинга через API Lalafo...")
+    print("Запуск проверки связи с API...")
     time.sleep(3)
-    send_to_all("🚀 **Бот переведён на прямой поиск API Lalafo!**\nСканирую текущие объявления...")
+    send_to_all("🧪 **Запуск проверки! Сейчас пришлю первые 5 любых телефонов с сайта...**")
     
-    check_count = 0
     scraper = cloudscraper.create_scraper()
-
-    # Специальные заголовки, чтобы Lalafo отдавал полный список JSON
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
-        "Country-Id": "12" # Кыргызстан
+        "Country-Id": "12"
     }
 
     while True:
         try:
-            check_count += 1
-            # Запрашиваем 40 самых свежих объявлений из категории телефонов
             params = {
                 "expand": "url",
                 "page": "1",
-                "per-page": "40",
-                "category_id": "1409", # Категория "Мобильные телефоны"
-                "sort_by": "created_at:desc"
+                "per-page": "20",
+                "category_id": "1409"
             }
             
             response = scraper.get(API_URL, headers=headers, params=params, timeout=15)
+            print(f"Статус ответа: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
                 items = data.get('items', [])
                 
+                count = 0
                 for item in items:
                     item_id = item.get('id')
                     if not item_id or item_id in seen_ids:
                         continue
                     
                     seen_ids.add(item_id)
+                    title = item.get('title', 'Без названия')
+                    price = item.get('price', '0')
+                    item_url = item.get('url', f"https://lalafo.kg/{item_id}")
+                    if not item_url.startswith('http'):
+                        item_url = "https://lalafo.kg" + item_url
                     
-                    title = item.get('title', '').lower()
-                    description = item.get('description', '').lower()
-                    full_text = f"{title} {description}"
+                    msg = f"📱 **Тест:** {title}\n💰 **Цена:** {price} KGS\n🔗 {item_url}"
+                    send_to_all(msg)
                     
-                    # Проверяем, что это iPhone / Айфон
-                    if 'iphone' in full_text or 'айфон' in full_text:
-                        price = item.get('price')
-                        
-                        # Фильтр цены: от 1 000 до 15 000 сом
-                        if price and 1000 <= int(price) <= 15000:
-                            price_val = int(price)
-                            item_url = item.get('url', f"https://lalafo.kg/kyrgyzstan/mobilnye-telefony-i-aksessuary/mobilnye-telefony/{item_id}")
-                            if not item_url.startswith('http'):
-                                item_url = "https://lalafo.kg" + item_url
-                                
-                            item_title = item.get('title', 'iPhone')
-                            
-                            msg = (
-                                f"🔥 **НАХОДКА ДО 15 000 СОМ!**\n\n"
-                                f"📱 **{item_title}**\n"
-                                f"💰 **Цена:** {price_val:,} KGS\n"
-                                f"🔗 {item_url}"
-                            ).replace(',', ' ')
-                            
-                            send_to_all(msg)
-                            print(f"⚡ Находка через API: {item_title} за {price_val} сом")
-                            time.sleep(1)
+                    count += 1
+                    if count >= 5: # Берём только 5 штук для теста
+                        break
+                    time.sleep(1)
             else:
-                print(f"Статус ответа API: {response.status_code}")
+                send_to_all(f"⚠️ Ошибка ответа API Lalafo: Код {response.status_code}")
 
         except Exception as e:
-            print(f"⚠️ Ошибка API: {e}. Повтор через 15 сек...")
-            time.sleep(15)
-            continue
+            print(f"⚠️ Ошибка: {e}")
+            send_to_all(f"⚠️ Сбой выполнения: {e}")
 
-        time.sleep(20)
+        time.sleep(30)
 
 threading.Thread(target=main_scraper_loop, daemon=True).start()
 
